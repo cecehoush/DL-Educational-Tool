@@ -36,7 +36,9 @@ Ensure you have Python installed. [Download Python](https://www.python.org/downl
 2. Install Streamlit:
 ```pip install streamlit```
 
-### Usage
+---
+
+## Usage
 1. Navigate to the client folder:
 ```cd client```
 
@@ -45,10 +47,14 @@ Ensure you have Python installed. [Download Python](https://www.python.org/downl
 
 3. Open the local server link (usually http://localhost:8501) to view the app.
 
+---
+
 ## Future Improvements
 - Add pre-trained deep learning models for predictions
 - Implement interactive learning modules and quizzes
 - Provide real-time visualizations of model outputs
+
+---
 
 ## Contributing
 We welcome contributions! Please follow these steps:
