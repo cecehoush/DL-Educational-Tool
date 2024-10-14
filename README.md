@@ -7,10 +7,8 @@ Welcome to the **Deep Learning Educational Tool**! This project aims to provide 
 2. [Features](#features)
 3. [Getting Started](#getting-started)
 4. [Usage](#usage)
-5. [Folder Structure](#folder-structure)
 6. [Future Improvements](#future-improvements)
 7. [Contributing](#contributing)
-8. [License](#license)
 
 ---
 
