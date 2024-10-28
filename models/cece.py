@@ -6,7 +6,8 @@ from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 import logging
-import dotenv
+import PyPDF2
+import os
 import dotenv
 
 # Set up logging
@@ -14,24 +15,43 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def load_documents(file_paths):
-    """Load documents from files and convert them to Document objects."""
+    """Load documents from files (txt or pdf) and convert them to Document objects."""
     docs = []
     for file_path in file_paths:
         try:
-            with open(file_path, 'r', encoding='utf-8') as file:
-                text = file.read()
-                # Skip empty documents
-                if text.strip():
-                    docs.append(Document(page_content=text))
-                    logger.info(f"Successfully loaded document: {file_path}")
-                else:
-                    logger.warning(f"Empty document found: {file_path}")
+            file_extension = os.path.splitext(file_path)[1].lower()
+            
+            if file_extension == '.pdf':
+                # Handle PDF files
+                with open(file_path, 'rb') as file:
+                    pdf_reader = PyPDF2.PdfReader(file)
+                    text = ""
+                    for page in pdf_reader.pages:
+                        text += page.extract_text() + "\n"
+                    if text.strip():
+                        docs.append(Document(page_content=text))
+                        logger.info(f"Successfully loaded PDF: {file_path}")
+                    else:
+                        logger.warning(f"Empty PDF found: {file_path}")
+            
+            elif file_extension == '.txt':
+                # Handle text files
+                with open(file_path, 'r', encoding='utf-8') as file:
+                    text = file.read()
+                    if text.strip():
+                        docs.append(Document(page_content=text))
+                        logger.info(f"Successfully loaded text file: {file_path}")
+                    else:
+                        logger.warning(f"Empty text file found: {file_path}")
+            else:
+                logger.warning(f"Unsupported file type: {file_path}")
+                
         except Exception as e:
             logger.error(f"Error loading document {file_path}: {str(e)}")
     return docs
 
-def create_text_chunks(documents, chunk_size=250, chunk_overlap=0):
-    """Split documents into smaller chunks."""
+def create_text_chunks(documents, chunk_size=500, chunk_overlap=50):
+    """Split documents into smaller chunks with increased size and overlap."""
     if not documents:
         raise ValueError("No documents provided for splitting")
 
@@ -72,8 +92,8 @@ class RAGApplication:
 
         # Create vector store with appropriate k value
         self.vectorstore = create_vectorstore(self.doc_splits, openai_api_key)
-        # Set k to be the minimum of 2 and the number of available chunks
-        self.k = min(2, self.max_k)
+        # Set k to be the minimum of 4 and the number of available chunks
+        self.k = min(4, self.max_k)
         self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": self.k})
 
         # Initialize LLM
@@ -84,12 +104,15 @@ class RAGApplication:
 
         # Create prompt template
         self.prompt = PromptTemplate(
-            template="""You are an assistant for question-answering tasks.
-            Use the following documents to answer the question.
-            If you don't know the answer, just say that you don't know.
-            Use three sentences maximum and keep the answer concise:
+            template="""You are a knowledgeable assistant helping students understand concepts from their textbook. 
+            Use the following textbook excerpts to answer the question.
+            If the answer is not contained in the excerpts, say "I cannot find information about this in the provided text."
+            Use three sentences maximum and keep the answer concise and focused.
+
+            Textbook excerpts:
+            {documents}
+
             Question: {question}
-            Documents: {documents}
             Answer:""",
             input_variables=["question", "documents"],
         )
@@ -110,8 +133,8 @@ class RAGApplication:
             logger.info(f"Successfully retrieved {len(documents)} documents")
 
             # Extract content from retrieved documents
-            doc_texts = "\n".join([doc.page_content for doc in documents])
-
+            doc_texts = "\n\n".join([doc.page_content for doc in documents])
+            
             # Get the answer from the language model
             answer = self.rag_chain.invoke({
                 "question": question,
@@ -126,7 +149,7 @@ class RAGApplication:
 
 def main():
     # Configuration
-    file_paths = ["textbook.txt"]
+    file_paths = ["textbook.pdf"]
     openai_api_key = dotenv.get_key(".env", "OPENAI_KEY")
     
     try:
@@ -137,11 +160,11 @@ def main():
         )
 
         # Example usage
-        question = "What is a partition?"
-        print("Question:", question)
+        question = "Where can't bono live?"
+        print("\nQuestion:", question)
         answer = rag_application.run(question)
-        print("Answer:", answer)
-
+        print("Answer:", answer, "\n")
+        
     except Exception as e:
         logger.error(f"Application error: {str(e)}")
         print("An error occurred while running the application.")
