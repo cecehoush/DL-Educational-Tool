@@ -7,6 +7,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 import logging
 import dotenv
+import dotenv
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -126,8 +127,8 @@ class RAGApplication:
 def main():
     # Configuration
     file_paths = ["textbook.txt"]
-    openai_api_key = dotenv.get_key(".env","OPENAI_KEY")
-
+    openai_api_key = dotenv.get_key(".env", "OPENAI_KEY")
+    
     try:
         # Initialize the RAG application
         rag_application = RAGApplication(
