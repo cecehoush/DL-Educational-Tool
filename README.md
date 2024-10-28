@@ -36,6 +36,11 @@ Ensure you have Python installed. [Download Python](https://www.python.org/downl
 2. Install Streamlit:
 ```pip install streamlit```
 
+3. Install Ollama and download the Llama 3.1 model to your local machine
+
+4. Set up the environment and install the necessary python libraries. 
+```pip install langchain langchain_community langchain-openai scikit-learn langchain-ollama```
+
 ---
 
 ## Usage
