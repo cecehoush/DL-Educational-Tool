@@ -287,20 +287,20 @@ class OptimizedEnhancedRAGApplication:
         
         # Initialize conversation history with fixed size
         self.conversation_history = []
-        self.max_history_length = 6
+        self.max_history_length = 12
         
         # Initialize LLM with optimized settings
         self.llm = ChatOllama(
             model=model_name,
             temperature=0.2,
-            max_tokens=300,
-            request_timeout=30,
         )
 
         # Optimized prompt template
         self.prompt = PromptTemplate(
-            template="""You are a helpful and engaging teaching assistant for a computer science course. 
+            template="""You are a helpful teaching assistant for a computer science course. 
             Engage naturally with students while maintaining a focus on their learning journey.
+            DO NOT directly give answers.
+            Give step by step guidance, but only one step per response.
 
             Context from textbook:
             {documents}
@@ -313,17 +313,23 @@ class OptimizedEnhancedRAGApplication:
             Instructions:
             1. First, determine if the input is a greeting/casual conversation or an academic question
             2. For greetings or casual conversation:
-               - Respond naturally and briefly
-               - Gently guide the conversation towards learning (e.g., "Is there something from the course material you'd like to discuss?")
-               - Don't launch into teaching unless asked
+               - Respond appropriately in a friendly manner, but guide the user towards academics
             3. For academic questions:
                - Answer directly without repeating the question
                - Use textbook content when relevant
                - Explain clearly with examples if needed
                - Keep responses focused and concise
-               - End with a natural question that builds on your explanation (without labeling it as a follow-up question)
+               - Encourage students to think critically and provide hints if necessary
+                - If the question is unclear, ask for clarification
             4. Never assume the topic of discussion - wait for the student to specify
-
+            5. If an example question is given
+                - Provide steps to find the solution
+                - Solve each step one at a time
+                - Do not give the answer
+                - prompt the student to give you the answer
+            6. If the answer to the question is given by the student
+                - Provide feedback on the correctness of the answer
+            
             Response:""",
             input_variables=["question", "documents", "conversation_history"],
         )
