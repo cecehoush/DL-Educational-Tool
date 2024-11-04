@@ -37,6 +37,7 @@ Ensure you have Python installed. [Download Python](https://www.python.org/downl
 ```pip install streamlit```
 
 3. Install Ollama and download the Llama 3.1 model to your local machine
+Run:```ollama pull llama3.1``` Every time you open the project.
 
 4. Set up the environment and install the necessary python libraries. 
 ```pip install langchain langchain_community langchain-openai scikit-learn langchain-ollama```
