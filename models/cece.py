@@ -147,23 +147,111 @@ class RAGApplication:
             logger.error(f"Error processing question: {str(e)}")
             return "I apologize, but I encountered an error while processing your question."
 
+class EnhancedRAGApplication:
+    def __init__(self, file_paths, openai_api_key, model_name="llama3.1"):
+        # Load and process documents
+        self.docs = load_documents(file_paths)
+        self.doc_splits = create_text_chunks(self.docs)
+
+        # Calculate maximum possible k value based on number of chunks
+        self.max_k = len(self.doc_splits)
+        logger.info(f"Maximum possible k value: {self.max_k}")
+
+        # Create vector store with appropriate k value
+        self.vectorstore = create_vectorstore(self.doc_splits, openai_api_key)
+        self.k = min(4, self.max_k)
+        self.retriever = self.vectorstore.as_retriever(search_kwargs={"k": self.k})
+        
+        # Initialize conversation history
+        self.conversation_history = []
+        
+        # Initialize LLM with slightly higher temperature for more natural responses
+        self.llm = ChatOllama(
+            model=model_name,
+            temperature=0.2,
+        )
+
+        # Enhanced prompt template
+        self.prompt = PromptTemplate(
+            template="""You are an intelligent and supportive teaching assistant helping students understand concepts. 
+            Your goal is to explain concepts clearly while connecting them to the student's current understanding.
+
+            Here are relevant excerpts from the course textbook:
+            {documents}
+
+            Previous conversation context:
+            {conversation_history}
+
+            Current question: {question}
+
+            Instructions for responding:
+            1. First, ground your response in the textbook content when available.
+            2. Then, expand on the concept using general knowledge and examples if needed.
+            3. Make connections to related concepts and real-world applications.
+            4. If the student seems confused, try explaining the concept in a different way.
+            5. If the textbook doesn't contain relevant information, provide a helpful explanation while noting that it's supplementary to the course material.
+
+            Use a natural, conversational tone while maintaining accuracy. Encourage deeper understanding through thoughtful explanation.
+
+            Response:""",
+            input_variables=["question", "documents", "conversation_history"],
+        )
+
+        self.rag_chain = self.prompt | self.llm | StrOutputParser()
+        logger.info("Enhanced RAG application initialized successfully")
+
+    def run(self, question):
+        """Run the enhanced RAG pipeline on a question."""
+        try:
+            # Retrieve relevant documents
+            documents = self.retriever.invoke(question)
+            doc_texts = "\n\n".join([doc.page_content for doc in documents])
+            
+            # Format conversation history
+            conversation_context = "\n".join([
+                f"{'Student' if i % 2 == 0 else 'Assistant'}: {msg}"
+                for i, msg in enumerate(self.conversation_history[-4:])  # Keep last 4 exchanges
+            ])
+            
+            # Get the answer
+            answer = self.rag_chain.invoke({
+                "question": question,
+                "documents": doc_texts,
+                "conversation_history": conversation_context
+            })
+            
+            # Update conversation history
+            self.conversation_history.extend([question, answer])
+            
+            return answer
+
+        except Exception as e:
+            logger.error(f"Error processing question: {str(e)}")
+            return "I apologize, but I encountered an error while processing your question."
+
 def main():
     # Configuration
     file_paths = ["textbook.pdf"]
     openai_api_key = dotenv.get_key(".env", "OPENAI_KEY")
     
     try:
-        # Initialize the RAG application
-        rag_application = RAGApplication(
+        # Initialize the Enhanced RAG application
+        rag_application = EnhancedRAGApplication(
             file_paths=file_paths,
             openai_api_key=openai_api_key
         )
 
         # Example usage
-        question = "Where can't bono live?"
-        print("\nQuestion:", question)
-        answer = rag_application.run(question)
-        print("Answer:", answer, "\n")
+        questions = [
+            "What is a set in mathematics?",
+            "Can you explain that in a simpler way?",
+            "Can you give me a real-world example?"
+        ]
+        
+        for question in questions:
+            print("\nStudent:", question)
+            answer = rag_application.run(question)
+            print("Assistant:", answer, "\n")
         
     except Exception as e:
         logger.error(f"Application error: {str(e)}")

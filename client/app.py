@@ -4,23 +4,20 @@ import sys
 import os
 from pathlib import Path
 
-# Add the project root directory to Python path
 project_root = Path(__file__).parent.parent
 sys.path.append(str(project_root))
 
-# Now we can import from models directory
 try:
-    from models.cece import RAGApplication
+    from models.cece import EnhancedRAGApplication
 except ImportError as e:
-    print(f"Error importing RAGApplication: {e}")
+    print(f"Error importing EnhancedRAGApplication: {e}")
     
-# Function to initialize RAG
 @st.cache_resource
 def init_rag():
     try:
-        file_paths = ["textbook.pdf"]  # Update with your actual file path
-        openai_api_key = os.getenv("OPENAI_KEY")  # Make sure to set this in your environment
-        return RAGApplication(
+        file_paths = ["textbook.pdf"] 
+        openai_api_key = os.getenv("OPENAI_KEY")  
+        return EnhancedRAGApplication(
             file_paths=file_paths,
             openai_api_key=openai_api_key
         )
@@ -112,7 +109,6 @@ def show_quiz_list():
         st.session_state.selected_class = None
         st.rerun()
 
-# Main app
 def main():
     st.set_page_config(page_title="DL Educational Tool", page_icon="🎓", layout="wide")
 
