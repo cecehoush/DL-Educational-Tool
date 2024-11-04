@@ -5,6 +5,7 @@ from langchain_ollama import ChatOllama
 from langchain.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
+from functools import lru_cache
 import logging
 import PyPDF2
 import os
@@ -229,14 +230,149 @@ class EnhancedRAGApplication:
             logger.error(f"Error processing question: {str(e)}")
             return "I apologize, but I encountered an error while processing your question."
 
+@lru_cache(maxsize=1)
+def load_documents_cached(file_path):
+    """Cache document loading to avoid repeated disk reads.
+    Now accepts a single file path instead of a tuple."""
+    try:
+        file_extension = os.path.splitext(file_path)[1].lower()
+        
+        if file_extension == '.pdf':
+            with open(file_path, 'rb') as file:
+                pdf_reader = PyPDF2.PdfReader(file)
+                text = ""
+                for page in pdf_reader.pages:
+                    text += page.extract_text() + "\n"
+                if text.strip():
+                    return [Document(page_content=text)]
+        
+        elif file_extension == '.txt':
+            with open(file_path, 'r', encoding='utf-8') as file:
+                text = file.read()
+                if text.strip():
+                    return [Document(page_content=text)]
+        
+        return []
+    except Exception as e:
+        logger.error(f"Error loading document {file_path}: {str(e)}")
+        return []
+
+@lru_cache(maxsize=1)
+def create_vectorstore_cached(doc_splits_hash, openai_api_key):
+    """Cache vectorstore creation to avoid recomputing embeddings."""
+    return create_vectorstore(doc_splits_hash[1], openai_api_key)
+
+# Optimized Enhanced RAG Application
+class OptimizedEnhancedRAGApplication:
+    def __init__(self, file_paths, openai_api_key, model_name="llama3.1"):
+        # Load documents one by one using cached function
+        self.docs = []
+        for file_path in file_paths:
+            self.docs.extend(load_documents_cached(file_path))
+        
+        # Create text chunks
+        self.doc_splits = create_text_chunks(self.docs, chunk_size=1000, chunk_overlap=100)
+        
+        # Initialize vectorstore (without caching for now to fix the error)
+        self.vectorstore = create_vectorstore(self.doc_splits, openai_api_key)
+        
+        # Optimize retrieval parameters
+        self.k = min(3, len(self.doc_splits))
+        self.retriever = self.vectorstore.as_retriever(
+            search_kwargs={
+                "k": self.k,
+                "fetch_k": self.k * 2
+            }
+        )
+        
+        # Initialize conversation history with fixed size
+        self.conversation_history = []
+        self.max_history_length = 6
+        
+        # Initialize LLM with optimized settings
+        self.llm = ChatOllama(
+            model=model_name,
+            temperature=0.2,
+            max_tokens=300,
+            request_timeout=30,
+        )
+
+        # Optimized prompt template
+        self.prompt = PromptTemplate(
+            template="""You are a helpful and engaging teaching assistant for a computer science course. 
+            Engage naturally with students while maintaining a focus on their learning journey.
+
+            Context from textbook:
+            {documents}
+
+            Previous context (for your reference only, do not repeat or acknowledge this):
+            {conversation_history}
+
+            Question/Input: {question}
+
+            Instructions:
+            1. First, determine if the input is a greeting/casual conversation or an academic question
+            2. For greetings or casual conversation:
+               - Respond naturally and briefly
+               - Gently guide the conversation towards learning (e.g., "Is there something from the course material you'd like to discuss?")
+               - Don't launch into teaching unless asked
+            3. For academic questions:
+               - Answer directly without repeating the question
+               - Use textbook content when relevant
+               - Explain clearly with examples if needed
+               - Keep responses focused and concise
+               - End with a natural question that builds on your explanation (without labeling it as a follow-up question)
+            4. Never assume the topic of discussion - wait for the student to specify
+
+            Response:""",
+            input_variables=["question", "documents", "conversation_history"],
+        )
+
+        self.rag_chain = self.prompt | self.llm | StrOutputParser()
+        logger.info("Optimized RAG application initialized")
+
+    def run(self, question):
+        """Optimized RAG pipeline execution."""
+        try:
+            # Retrieve relevant documents
+            documents = self.retriever.invoke(question)
+            
+            # Process only the most relevant parts of the documents
+            doc_texts = "\n\n".join([
+                doc.page_content[:500] for doc in documents
+            ])
+            
+            # Format conversation history but don't include current question
+            conversation_context = "\n".join([
+                f"{'Student' if i % 2 == 0 else 'Assistant'}: {msg}"
+                for i, msg in enumerate(self.conversation_history[-self.max_history_length:])
+            ])
+            
+            # Get the answer
+            answer = self.rag_chain.invoke({
+                "question": question,
+                "documents": doc_texts,
+                "conversation_history": conversation_context
+            })
+            
+            # Update conversation history
+            self.conversation_history.extend([question, answer])
+            if len(self.conversation_history) > self.max_history_length:
+                self.conversation_history = self.conversation_history[-self.max_history_length:]
+            
+            return answer
+
+        except Exception as e:
+            logger.error(f"Error processing question: {str(e)}")
+            return "I apologize, but I encountered an error while processing your question."
+
 def main():
     # Configuration
     file_paths = ["textbook.pdf"]
     openai_api_key = dotenv.get_key(".env", "OPENAI_KEY")
     
     try:
-        # Initialize the Enhanced RAG application
-        rag_application = EnhancedRAGApplication(
+        rag_application = OptimizedEnhancedRAGApplication(
             file_paths=file_paths,
             openai_api_key=openai_api_key
         )
