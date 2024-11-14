@@ -57,8 +57,13 @@ def show_chat_interface():
     
     # Initialize message history in session state if it doesn't exist
     if "message_history" not in st.session_state:
+        initial_message = "(Chatbot): "
+        if hasattr(st.session_state, 'chat_mode') and st.session_state.chat_mode == "quiz":
+            initial_message += "Hello! Please share your quiz question, and I'll help you work through it step by step."
+        else:
+            initial_message += "Hello, do you have a quiz question you need help with, or do you need general help with Discrete Structures?"
         st.session_state.message_history = [
-            {"role": "assistant", "content": "(Chatbot): Hello, do you have a quiz question you need help with, or do you need general help with Discrete Structures?"}
+            {"role": "assistant", "content": initial_message}
         ]
     
     # Initialize RAG
@@ -114,11 +119,75 @@ def show_chat_interface():
             # Force a rerun to update the UI
             st.rerun()
 
+def show_student_course_options():
+    st.title(f"Learning Assistant - {st.session_state.selected_course}")
+    
+    st.markdown("<h3 style='text-align: center;'>What would you like to discuss today?</h3>", unsafe_allow_html=True)
+    
+    st.write("")
+    
+    col1, col2, col3 = st.columns([2, 2, 2]) 
+
+    with col2:
+        col_a, col_b = st.columns(2)
+        with col_a:
+            if st.button("General Course Questions", use_container_width=True):
+                st.session_state.page = "chat"
+                st.session_state.chat_mode = "general"
+                st.rerun()
+        with col_b:
+            if st.button("Quiz Help", use_container_width=True):
+                st.session_state.page = "chat"
+                st.session_state.chat_mode = "quiz"
+                st.rerun()
+    
+    st.write("")  
+    
+
+    col1, col2, col3 = st.columns([3, 1, 3]) 
+    with col2:
+        if st.button("Back to Courses"):
+            st.session_state.selected_course = None
+            st.rerun()
+
+def show_student_view():
+    st.title("Student Learning Assistant")
+    
+    st.write("Your Courses:")
+    courses = ["Discrete Structures", "CS101: Intro to Programming", "MATH201: Linear Algebra"]
+    for course in courses:
+        if st.button(course, key=course, use_container_width=False):
+            st.session_state.selected_course = course
+            st.rerun()
+    
+    st.write("")
+    st.markdown("---")  
+    st.write("Additional Features:")
+    
+    st.markdown("""
+        <style>
+        .feature-button {
+            background-color: #f0f2f6;
+            border: 1px solid #e0e0e0;
+            padding: 0.5rem;
+            border-radius: 4px;
+            margin: 0.25rem 0;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+    
+    col1, col2, col3 = st.columns([1, 2, 1])  
+    with col2:
+        if st.button("Previous Conversations", use_container_width=True, key="prev_conv"):
+            st.info("Feature coming soon!")
+            
+        if st.button("Practice Mode", use_container_width=True, key="practice"):
+            st.info("Feature coming soon!")
+
 def show_class_list():
     st.title("Deep Learning Educational Tool")
     st.write("Welcome, Professor! Here are your classes:")
 
-    # Add Chat Interface button
     if st.button("Open Chat Interface", key="chat_button"):
         st.session_state.page = "chat"
         if "message_history" in st.session_state:
@@ -144,8 +213,12 @@ def show_quiz_list():
 
 def main():
     st.set_page_config(page_title="DL Educational Tool", page_icon="🎓", layout="wide")
-
-    # Initialize session state
+    
+    # Initializing session states :v
+    if 'role' not in st.session_state:
+        st.session_state.role = None
+    if 'page' not in st.session_state:
+        st.session_state.page = "home"
     if 'classes' not in st.session_state:
         st.session_state.classes = generate_fixed_classes()
     
@@ -157,23 +230,43 @@ def main():
     
     if 'selected_class' not in st.session_state:
         st.session_state.selected_class = None
-        
-    if 'page' not in st.session_state:
-        st.session_state.page = "home"
+    if 'selected_course' not in st.session_state:
+        st.session_state.selected_course = None
+    
+    if st.session_state.role is None:
+        st.title("Welcome to the Learning Assistant")
+        st.write("")
+        st.write("")
+        _, col2, _ = st.columns([1, 2, 1])
+        with col2:
+            if st.button("I'm a Student", use_container_width=True):
+                st.session_state.role = "student"
+                st.rerun()
+            st.write("")
+            if st.button("I'm a Professor", use_container_width=True):
+                st.session_state.role = "professor"
+                st.rerun()
+        return
 
-    # Navigation
+    # Navigation :v
     if st.session_state.page == "chat":
         show_chat_interface()
-        if st.button("Back to Home"):
+        if st.button("Back"):
+            st.session_state.page = "home"
             if "message_history" in st.session_state:
                 st.session_state.message_history = []
-            st.session_state.page = "home"
             st.rerun()
     else:
-        if st.session_state.selected_class is None:
-            show_class_list()
+        if st.session_state.role == "student":
+            if st.session_state.selected_course is None:
+                show_student_view()
+            else:
+                show_student_course_options()
         else:
-            show_quiz_list()
+            if st.session_state.selected_class is None:
+                show_class_list()
+            else:
+                show_quiz_list()
 
 if __name__ == "__main__":
     main()
